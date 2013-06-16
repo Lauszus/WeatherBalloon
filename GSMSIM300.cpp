@@ -184,26 +184,21 @@ bool GSMSIM300::checkSMS() {
       readIndex = false;
     }
   } 
-  // TODO: Can be put in function below when finished
-  else if (incomingChar == *pReceiveSmsString) {
-    pReceiveSmsString++;
-    if (*pReceiveSmsString == '\0') {
-      readIndex = true;
-      indexCounter = 0;
-      //Serial.println(F("Received SMS"));
-    }
-  } else
-    pReceiveSmsString = (char*)receiveSmsString; // Reset pointer to start of string
+  else if (checkString(receiveSmsString,&pReceiveSmsString)) {
+    readIndex = true;
+    indexCounter = 0;
+    //Serial.println(F("Received SMS"));
+  }
   return false;
 }
 
-// I know this seem confusing, but in order to change the pointer I have to create a pointer to a pointer
-// *(*pString) will get the value of the pointer, while
-// (*pString) will get the address of the pointer
+// I know this might seem confusing, but in order to change the pointer I have to create a pointer to a pointer
+// **pString will get the value of the original pointer, while
+// *pString will get the address of the original pointer
 bool GSMSIM300::checkString(const char *cmpString, char **pString) {
-  if (incomingChar == *(*pString)) {
+  if (incomingChar == **pString) {
     (*pString)++;
-    if (*(*pString) == '\0')
+    if (**pString == '\0')
       return true;
   } else
     *pString = (char*)cmpString; // Reset pointer to start of string
