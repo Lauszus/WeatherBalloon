@@ -1,47 +1,82 @@
-SoftwareSerial gsm(2, 3); // RX, TX
+/* Copyright (C) 2013 Kristian Lauszus, TKJ Electronics. All rights reserved.
 
-// The GSM module is a SIM300
+ This software may be distributed and modified under the terms of the GNU
+ General Public License version 2 (GPL2) as published by the Free Software
+ Foundation and appearing in the file GPL2.TXT included in the packaging of
+ this file. Please note that GPL2 Section 2[b] requires that all works based
+ on this software must also be made publicly available under the terms of
+ the GPL2 ("Copyleft").
 
-void gsmInit() {
+ Contact information
+ -------------------
+
+ Kristian Lauszus, TKJ Electronics
+ Web      :  http://www.tkjelectronics.com
+ e-mail   :  kristianl@tkjelectronics.com
+ */
+
+#include "GSMSIM300.h"
+
+const char* receiveSmsString = "+CMTI: \"SM\","; // +CMTI: "SM",index\r\n
+const char* incomingCallString = "RING";
+const char* callHangupString = "NO CARRIER";
+
+GSMSIM300::GSMSIM300(const char *pinCode, uint8_t rx, uint8_t tx, uint8_t powerPin) :
+pinCode(pinCode),
+powerPin(powerPin),
+pGsmString(gsmString),
+pOutString(outString),
+pReceiveSmsString((char*)receiveSmsString),
+pIncomingCallString((char*)incomingCallString),
+pCallHangupString((char*)callHangupString),
+readIndex(false)
+{
   pinMode(powerPin,OUTPUT);
   digitalWrite(powerPin,HIGH);
-  pinMode(LED,OUTPUT);
-  
-  gsm.begin(9600);
+
+  gsm = new SoftwareSerial(rx, tx);
+  gsm->begin(9600);
+#ifdef DEBUG
   Serial.println(F("GSM started"));
+#endif
   gsmState = GSM_POWER_ON;
   smsState = SMS_IDLE;
   callState = CALL_IDLE;
 }
 
-void updateGsm() {
-    incomingChar = gsm.read();
-#ifdef DEBUG
+void GSMSIM300::update() {
+    incomingChar = gsm->read();
+#ifdef EXTRADEBUG
     if(incomingChar != -1)
       Serial.write(incomingChar);
 #endif
     switch(gsmState) {
       case GSM_POWER_ON:
         delay(1000);
-        gsm.print(F("AT+CPOWD=0\r")); // Turn off the module if it's already on
+        gsm->print(F("AT+CPOWD=0\r")); // Turn off the module if it's already on
+#ifdef DEBUG
         Serial.println(F("GSM PowerOn"));
+#endif
         delay(2000);
-        gsmPowerOn();
-        
+        powerOn();
+#ifdef DEBUG
         Serial.println(F("GSM check state"));
-        gsm.print(F("AT\r"));
+#endif
+        gsm->print(F("AT\r"));
         delay(500);
-        gsm.print(F("AT\r"));
+        gsm->print(F("AT\r"));
         setGsmWaitingString("OK");
         gsmState = GSM_POWER_ON_WAIT;
         break;
         
       case GSM_POWER_ON_WAIT:
         if(checkGsmWaitingString()) {
+#ifdef DEBUG
           Serial.println(F("GSM Module is powered on\r\nChecking SIM Card"));
-          gsm.print(F("AT+CPIN="));
-          gsm.print(pinCode); // Set pin
-          gsm.print(F("\r"));
+#endif
+          gsm->print(F("AT+CPIN="));
+          gsm->print(pinCode); // Set pin
+          gsm->print(F("\r"));
           setGsmWaitingString("Call Ready");
           gsmState = GSM_SET_PIN;
         }
@@ -49,14 +84,19 @@ void updateGsm() {
         
       case GSM_SET_PIN:
         if(checkGsmWaitingString()) {
+#ifdef DEBUG
           Serial.println(F("SIM Card ready"));
+          Serial.println(F("Waiting for GSM to get ready"));
+#endif
           gsmState = GSM_CHECK_CONNECTION;
         }
         break;
         
       case GSM_CHECK_CONNECTION:
-        Serial.println(F("Checking Connection..."));
-        gsm.print(F("AT+CREG?\r"));
+#ifdef EXTRADEBUG
+        Serial.println(F("Checking Connection"));
+#endif
+        gsm->print(F("AT+CREG?\r"));
         setGsmWaitingString("+CREG: 0,");
         gsmState = GSM_CHECK_CONNECTION_WAIT;
         break;
@@ -68,13 +108,17 @@ void updateGsm() {
         
       case GSM_CONNECTION_RESPONSE:
         if(incomingChar != -1) {
+#ifdef EXTRADEBUG
           Serial.print(F("Connection response: "));
           Serial.println(incomingChar);
+#endif
           if(incomingChar != '1') {
             delay(1000);
             gsmState = GSM_CHECK_CONNECTION;
           } else {
+#ifdef DEBUG
             Serial.println(F("GSM module is up and running!\r\n"));
+#endif
             gsmState = GSM_RUNNING;
           }
         }
@@ -85,22 +129,26 @@ void updateGsm() {
         updateCall();
         if(incomingChar != -1) {
           if (checkSMS()) // Return true if a new SMS is received
-            newSMS = true;
+            newSms = true;
           checkIncomingCall();
         }
         break;
       
       case GSM_POWER_OFF:
+#ifdef DEBUG
         Serial.println(F("Shutting down GSM module"));
-        gsm.print(F("AT+CPOWD=1\r")); // Turn off the module if it's already on
+#endif
+        gsm->print(F("AT+CPOWD=1\r")); // Turn off the module if it's already on
         setGsmWaitingString("NORMAL POWER DOWN");
         gsmState = GSM_POWER_OFF_WAIT;
         break;
       
       case GSM_POWER_OFF_WAIT:
         if(checkGsmWaitingString()) {
-          gsmPowerOff();
+          powerOff();
+#ifdef DEBUG
           Serial.println(F("GSM PowerOff"));
+#endif
           gsmState = GSM_POWER_ON;
         }
         break;
@@ -110,12 +158,14 @@ void updateGsm() {
     }
 }
 
-boolean checkSMS() {
+bool GSMSIM300::checkSMS() {
   if (readIndex) {
     if (incomingChar == '\r') { // End of index
       readIndex = false;
+#ifdef DEBUG
       Serial.print(F("Received SMS at index: "));
       Serial.println(lastIndex);
+#endif
       return true;
     } else if (indexCounter < sizeof(lastIndex)/sizeof(lastIndex[0])-1) {
       //Serial.println(F("Storing index"));
@@ -123,7 +173,9 @@ boolean checkSMS() {
       lastIndex[indexCounter+1] = '\0';
       indexCounter++;
     } else {
+#ifdef DEBUG
       Serial.println(F("Index is too long"));
+#endif
       readIndex = false;
     }
   } 
@@ -136,52 +188,58 @@ boolean checkSMS() {
       //Serial.println(F("Received SMS"));
     }
   } else
-    pReceiveSmsString = receiveSmsString; // Reset pointer to start of string
+    pReceiveSmsString = (char*)receiveSmsString; // Reset pointer to start of string
   return false;
 }
 
 // TODO: Make more general function to check any string
-void checkIncomingCall() {
+void GSMSIM300::checkIncomingCall() {
   if (incomingChar == *pIncomingCallString) {
     pIncomingCallString++;
     if (*pIncomingCallString == '\0') {
+#ifdef DEBUG
       Serial.println(F("Incoming Call"));
+#endif
       callAnswer();
     }
   } else
-    pIncomingCallString = incomingCallString; // Reset pointer to start of string
+    pIncomingCallString = (char*)incomingCallString; // Reset pointer to start of string
 }
 
-void checkCallHangup() {
+void GSMSIM300::checkCallHangup() {
   if (incomingChar == *pCallHangupString) {
     pCallHangupString++;
     if (*pCallHangupString == '\0') {
+#ifdef DEBUG
       Serial.println(F("Call hangup!"));
+#endif
       callState = CALL_IDLE;
     }
   } else
-    pCallHangupString = callHangupString; // Reset pointer to start of string
+    pCallHangupString = (char*)callHangupString; // Reset pointer to start of string
 }
 
 // TODO: Check if updateSMS or updateCall is caught in a loop
-void updateSMS() {
+void GSMSIM300::updateSMS() {
   switch(smsState) {
     case SMS_IDLE:
       break;
       
     case SMS_MODE:
+#ifdef DEBUG
       Serial.println(F("SMS setting text mode"));
-      
-      gsm.print(F("AT+CMGF=1\r")); // Set SMS type to text mode
+#endif
+      gsm->print(F("AT+CMGF=1\r")); // Set SMS type to text mode
       setOutWaitingString("OK");
       smsState = SMS_ALPHABET;
       break;
       
     case SMS_ALPHABET:
       if(checkOutWaitingString()) {
+#ifdef DEBUG
         Serial.println(F("SMS setting alphabet"));
-        
-        gsm.print(F("AT+CSCS=\"GSM\"\r")); // GSM default alphabet
+#endif
+        gsm->print(F("AT+CSCS=\"GSM\"\r")); // GSM default alphabet
         setOutWaitingString("OK");
         smsState = SMS_NUMBER;
       }
@@ -189,12 +247,13 @@ void updateSMS() {
       
     case SMS_NUMBER:
       if(checkOutWaitingString()) {
+#ifdef DEBUG
         Serial.print(F("Number: "));
         Serial.println(numberBuffer);
-        
-        gsm.print(F("AT+CMGS=\""));
-        gsm.print(numberBuffer);
-        gsm.print(F("\"\r"));
+#endif
+        gsm->print(F("AT+CMGS=\""));
+        gsm->print(numberBuffer);
+        gsm->print(F("\"\r"));
         setOutWaitingString(">");
         smsState = SMS_CONTENT;
       }
@@ -202,12 +261,13 @@ void updateSMS() {
       
     case SMS_CONTENT:
       if(checkOutWaitingString()) {
+#ifdef DEBUG
         Serial.print(F("Message: \""));
         Serial.print(messageBuffer);
         Serial.println("\"");
-        
-        gsm.print(messageBuffer);
-        gsm.write(26); // CTRL-Z
+#endif
+        gsm->print(messageBuffer);
+        gsm->write(26); // CTRL-Z
         setOutWaitingString("OK");
         smsState = SMS_WAIT;
       }
@@ -215,7 +275,9 @@ void updateSMS() {
       
     case SMS_WAIT:
       if(checkOutWaitingString()) {
+#ifdef DEBUG
         Serial.println(F("SMS is sent"));
+#endif
         smsState = SMS_IDLE;
       }
       break;
@@ -225,45 +287,58 @@ void updateSMS() {
   }
 }
 
-void updateCall() {
+void GSMSIM300::updateCall() {
   switch(callState) {
     case CALL_IDLE:
       break;
       
     case CALL_NUMBER:
+#ifdef DEBUG
       Serial.print(F("Calling: "));
       Serial.println(numberBuffer);
-
-      gsm.print(F("ATD")); // Dial
-      gsm.print(numberBuffer);
-      gsm.print(F(";\r"));
+#endif
+      gsm->print(F("ATD")); // Dial
+      gsm->print(numberBuffer);
+      gsm->print(F(";\r"));
       callState = CALL_SETUP;
+#ifdef DEBUG
+      Serial.print(F("Waiting for connection"));
+#endif
       break;
       
     case CALL_SETUP:
-      Serial.println(F("\r\nWaiting for connection..."));
-
-      gsm.print(F("AT+CLCC\r"));
+#if defined(DEBUG)
+      Serial.print(F("."));
+#elif EXTRADEBUG
+      Serial.print(F("\r\nChecking response"));
+#endif
+      gsm->print(F("AT+CLCC\r"));
       setOutWaitingString("+CLCC: 1,0,");
       callState = CALL_SETUP_WAIT;
       break;
       
     case CALL_SETUP_WAIT:
       if(checkOutWaitingString()) {
-        Serial.println(F("Checking response"));
+#ifdef EXTRADEBUG
+        Serial.print(F("\r\nGot first response"));
+#endif
         callState = CALL_RESPONSE;
       }
       break;
       
     case CALL_RESPONSE:
       if(incomingChar != -1) {
-        Serial.print(F("Connection response: "));
-        Serial.println(incomingChar);
+#ifdef EXTRADEBUG
+        Serial.print(F("\r\nConnection response: "));
+        Serial.print(incomingChar);
+#endif
         if(incomingChar != '0') {
           delay(1000);
           callState = CALL_SETUP;
         } else {
-          Serial.print(F("Call active"));
+#ifdef DEBUG
+          Serial.println(F("\r\nCall active"));
+#endif
           callState = CALL_ACTIVE;
         }
       }
@@ -279,25 +354,24 @@ void updateCall() {
   }
 }
 
-void setGsmWaitingString(const char* str) {
+void GSMSIM300::setGsmWaitingString(const char* str) {
   strcpy(gsmString,str);
   pGsmString = gsmString;
   gsmTimer = millis();
 }
 
-void setOutWaitingString(const char* str) {
+void GSMSIM300::setOutWaitingString(const char* str) {
   strcpy(outString,str);
   pOutString = outString;
 }
 
 // TODO: Combine these two function
-boolean checkGsmWaitingString() {
+bool GSMSIM300::checkGsmWaitingString() {
   if(incomingChar != -1) {
     if(incomingChar == *pGsmString) {
-      digitalWrite(LED,!digitalRead(LED)); // Blink the LED
       pGsmString++;
       if(*pGsmString == '\0') {
-#ifdef DEBUG
+#ifdef EXTRADEBUG
         Serial.print(F("\r\nGSM Response success: "));
         Serial.write((uint8_t*)gsmString, strlen(gsmString));
         Serial.println();
@@ -308,20 +382,21 @@ boolean checkGsmWaitingString() {
   }
   if(millis() - gsmTimer > 10000) { // Only wait 10s for response    
     if(gsmState != GSM_RUNNING) {
+#ifdef DEBUG
       Serial.println("\r\nNo response from GSM module\r\nResetting...");
+#endif
       gsmState = GSM_POWER_ON;
     }
   }
   return false;
 }
 
-boolean checkOutWaitingString() {
+bool GSMSIM300::checkOutWaitingString() {
   if(incomingChar != -1) {
     if(incomingChar == *pOutString) {
-      digitalWrite(LED,!digitalRead(LED)); // Blink the LED
       pOutString++;
       if(*pOutString == '\0') {
-#ifdef DEBUG
+#ifdef EXTRADEBUG
         Serial.print(F("\r\nOut Response success: "));
         Serial.write((uint8_t*)outString, strlen(outString));
         Serial.println();
@@ -333,39 +408,47 @@ boolean checkOutWaitingString() {
   return false;
 }
 
-void call(const char* num) {
+void GSMSIM300::call(const char* num) {
   strcpy(numberBuffer,num);
   callState = CALL_NUMBER;
 }
-
-void gsmActivateAutoAnswer() {
-  gsm.print(F("ATS0=001\r")); // 'RING' will be received on an incoming call  
+/*
+void GSMSIM300::gsmActivateAutoAnswer() {
+  gsm->print(F("ATS0=001\r")); // 'RING' will be received on an incoming call  
 }
-
-void callHangup() {
-  gsm.print(F("ATH\r")); // Response: 'OK'
+*/
+void GSMSIM300::callHangup() {
+  gsm->print(F("ATH\r")); // Response: 'OK'
+#ifdef DEBUG
+  Serial.println(F("Call hangup!"));
+#endif
   callState = CALL_IDLE;
 }
 
-void callAnswer() {
-  gsm.print(F("ATA\r"));
+void GSMSIM300::callAnswer() {
+  gsm->print(F("ATA\r"));
   callState = CALL_ACTIVE;
 }
 
-//gsm.print(F("AT+CSQ\r")); // Check signal strength - response: 'OK' and then the information
+//gsm->print(F("AT+CSQ\r")); // Check signal strength - response: 'OK' and then the information
 
-void sendSMS(const char* num, const char* mes) {  
+void GSMSIM300::sendSMS(const char* num, const char* mes) {
   strcpy(numberBuffer,num);
   strcpy(messageBuffer,mes);
   smsState = SMS_MODE;
 }
 
-boolean readSMS(const char* index) {
-  newSMS = false;
-  gsm.print(F("AT+CMGF=1\r"));
-  gsm.print(F("AT+CMGR="));
-  gsm.print(index);
-  gsm.print(F("\r"));
+bool GSMSIM300::readSMS(char* index) {
+  if (index == NULL) {
+    if (lastIndex == NULL)
+      return false;    
+    index = lastIndex;
+  }
+  newSms = false;
+  gsm->print(F("AT+CMGF=1\r"));
+  gsm->print(F("AT+CMGR="));
+  gsm->print(index);
+  gsm->print(F("\r"));
   
   uint32_t startTime = millis();
   int8_t i = -1;
@@ -377,16 +460,18 @@ boolean readSMS(const char* index) {
   // content
   
   while(millis() - startTime < 1000) { // Only do this for 1s
-    while(!gsm.available());
-    char c = gsm.read();
-#ifdef DEBUG
+    while(!gsm->available());
+    char c = gsm->read();
+#ifdef EXTRADEBUG
     Serial.write(c);
 #endif
     if (reading) {
       if (i > -1) {
         if (c == '"') { // Second "
+#if defined(DEBUG) && !defined(EXTRADEBUG)
           Serial.print(F("Extracted the following number: "));
           Serial.println(numberBuffer);
+#endif
           numberFound = true;
           break;
         }
@@ -403,33 +488,37 @@ boolean readSMS(const char* index) {
   reading = false;
   
   while(millis() - startTime < 1000) { // Only do this for 1s
-    while(!gsm.available());
-    char c = gsm.read();
-#ifdef DEBUG
+    while(!gsm->available());
+    char c = gsm->read();
+#ifdef EXTRADEBUG
     Serial.write(c);
 #endif
     if (reading) {
       // TODO: Gem i messageBuffer
+#if defined(DEBUG) && !defined(EXTRADEBUG)
       Serial.write(c);
+#endif
       if (c == '\n') // End of second string
         break;
     }
     else if (c == '\n') { // End of first string
       reading = true;
+#ifdef DEBUG
       Serial.print(F("Received message: "));
+#endif
     }
   }
   // TODO: 'return numberFound && messageFound;'
   return numberFound;
 }
 
-void gsmPowerOn() {
+void GSMSIM300::powerOn() {
   digitalWrite(powerPin,LOW);
   delay(4000);
   digitalWrite(powerPin,HIGH);
   delay(2000);
 }
-void gsmPowerOff() {  
+void GSMSIM300::powerOff() {  
   digitalWrite(powerPin,LOW);
   delay(800);
   digitalWrite(powerPin,HIGH);

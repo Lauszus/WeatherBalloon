@@ -4,20 +4,20 @@
 //#define ENABLE_TEMP
 //#define ENABLE_SD_RTC
 
-#define DEBUG
-
 #include <Wire.h>
 #include <SoftwareSerial.h>
 #include <MemoryFree.h>
+#include "GSMSIM300.h" // My GSM library
 #include "WeatherBalloon.h"
 #include "secret.h" // Contains our numbers, pin code etc.
 
 uint32_t timer;
 
+GSMSIM300 GSM(pinCode,2,3,4); // Pin code, rx, tx, powerPin
+
 void setup() {
   Serial.begin(115200);
   Wire.begin(); // All calls to Wire.begin has been removed in the libraries, so it's only called once
-  gsmInit();
   //gpsInit();  
   //pressureInit();
   //timeInit();
@@ -30,22 +30,22 @@ void setup() {
 }
 
 void loop() {
-  updateGsm();
-  if (gsmState == GSM_RUNNING) {
+  GSM.update();
+  if (GSM.gsmState == GSM_RUNNING) {
     if (Serial.available()) {
       char c = Serial.read();
       if (c == 'C')
-        call(number);
+        GSM.call(number);
       else if (c == 'H')
-        callHangup();
+        GSM.callHangup();
       else if (c == 'S')
-        sendSMS(number, "Nu skulle det gerne virke :)");
+        GSM.sendSMS(number, "Send lige en sms :)");
       else if (c == 'R')
-        readSMS(lastIndex);
+        GSM.readSMS();
     }
-    if(newSMS) {
-      if(readSMS(lastIndex)) // Returns true if the number of the sender is successfully extracted from the SMS
-        sendSMS(numberBuffer, "Automatic response from WeatherBallon\nMy coordinates are: (lat,lng)");
+    if(GSM.newSMS()) {
+      if(GSM.readSMS()) // Returns true if the number of the sender is successfully extracted from the SMS
+        GSM.sendSMS(GSM.numberBuffer, "Automatic response from WeatherBallon\nMy coordinates are: (lat,lng)");
     } 
   }
   /*
