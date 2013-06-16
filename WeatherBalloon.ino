@@ -37,7 +37,7 @@ void loop() {
       if (c == 'C')
         GSM.call(number);
       else if (c == 'H')
-        GSM.callHangup();
+        GSM.hangup();
       else if (c == 'S')
         GSM.sendSMS(number, "Send lige en sms :)");
       else if (c == 'R')

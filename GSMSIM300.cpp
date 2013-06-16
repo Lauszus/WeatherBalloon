@@ -19,7 +19,10 @@
 
 const char* receiveSmsString = "+CMTI: \"SM\","; // +CMTI: "SM",index\r\n
 const char* incomingCallString = "RING";
-const char* callHangupString = "NO CARRIER";
+const char* hangupCallString = "NO CARRIER";
+const char* powerDownString = "NORMAL POWER DOWN";
+
+// TODO: Remove all delays
 
 GSMSIM300::GSMSIM300(const char *pinCode, uint8_t rx, uint8_t tx, uint8_t powerPin) :
 pinCode(pinCode),
@@ -28,8 +31,10 @@ pGsmString(gsmString),
 pOutString(outString),
 pReceiveSmsString((char*)receiveSmsString),
 pIncomingCallString((char*)incomingCallString),
-pCallHangupString((char*)callHangupString),
-readIndex(false)
+pHangupCallString((char*)hangupCallString),
+pPowerDownString((char*)powerDownString),
+readIndex(false),
+_newSMS(false)
 {
   pinMode(powerPin,OUTPUT);
   digitalWrite(powerPin,HIGH);
@@ -50,6 +55,13 @@ void GSMSIM300::update() {
     if(incomingChar != -1)
       Serial.write(incomingChar);
 #endif
+    if (checkString(powerDownString,&pPowerDownString)) {
+#ifdef DEBUG
+      Serial.println(F("GSM Module turned off"));
+#endif
+      gsmState = GSM_POWER_ON;
+    }
+
     switch(gsmState) {
       case GSM_POWER_ON:
         delay(1000);
@@ -129,12 +141,12 @@ void GSMSIM300::update() {
         updateCall();
         if(incomingChar != -1) {
           if (checkSMS()) // Return true if a new SMS is received
-            newSms = true;
+            _newSMS = true;
           if (checkString(incomingCallString,&pIncomingCallString)) {
 #ifdef DEBUG
             Serial.println(F("Incoming Call"));
 #endif
-            callAnswer();
+            answer();
           }
         }
         break;
@@ -144,7 +156,7 @@ void GSMSIM300::update() {
         Serial.println(F("Shutting down GSM module"));
 #endif
         gsm->print(F("AT+CPOWD=1\r")); // Turn off the module if it's already on
-        setGsmWaitingString("NORMAL POWER DOWN");
+        setGsmWaitingString(powerDownString);
         gsmState = GSM_POWER_OFF_WAIT;
         break;
       
@@ -332,7 +344,7 @@ void GSMSIM300::updateCall() {
       
     case CALL_ACTIVE:
       if(incomingChar != -1) {
-        if (checkString(callHangupString,&pCallHangupString)) {
+        if (checkString(hangupCallString,&pHangupCallString)) {
 #ifdef DEBUG
           Serial.println(F("Call hangup!"));
 #endif
@@ -409,7 +421,7 @@ void GSMSIM300::gsmActivateAutoAnswer() {
   gsm->print(F("ATS0=001\r")); // 'RING' will be received on an incoming call  
 }
 */
-void GSMSIM300::callHangup() {
+void GSMSIM300::hangup() {
   gsm->print(F("ATH\r")); // Response: 'OK'
 #ifdef DEBUG
   Serial.println(F("Call hangup!"));
@@ -417,7 +429,7 @@ void GSMSIM300::callHangup() {
   callState = CALL_IDLE;
 }
 
-void GSMSIM300::callAnswer() {
+void GSMSIM300::answer() {
   gsm->print(F("ATA\r"));
   callState = CALL_ACTIVE;
 }
@@ -436,7 +448,7 @@ bool GSMSIM300::readSMS(char* index) {
       return false;    
     index = lastIndex;
   }
-  newSms = false;
+  _newSMS = false;
   gsm->print(F("AT+CMGF=1\r"));
   gsm->print(F("AT+CMGR="));
   gsm->print(index);

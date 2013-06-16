@@ -59,10 +59,10 @@ public:
 	void update();
 	bool checkSMS();
  	bool newSMS() {
- 		return newSms;
+ 		return _newSMS;
  	};
  	void call(const char* num);
-	void callHangup();
+	void hangup();
 	void sendSMS(const char* num, const char* mes);
 	bool readSMS(char* index = NULL);
  	uint8_t gsmState, smsState, callState; 	
@@ -77,7 +77,7 @@ private:
 	bool checkGsmWaitingString();
 	bool checkOutWaitingString();	
 	//void gsmActivateAutoAnswer();	
-	void callAnswer();	
+	void answer();	
 	void powerOn();
 	void powerOff();
 
@@ -86,12 +86,12 @@ private:
 	const char* pinCode;
 	char lastIndex[5];
 
-	bool newSms;
+	bool _newSMS;
 	char incomingChar;
 	char gsmString[20], outString[20];
 	char *pGsmString, *pOutString;
 
-	char *pReceiveSmsString, *pIncomingCallString, *pCallHangupString;
+	char *pReceiveSmsString, *pIncomingCallString, *pHangupCallString, *pPowerDownString;
 	bool readIndex;	
 	uint8_t indexCounter;
 
@@ -100,6 +100,7 @@ private:
 
 extern const char* receiveSmsString; // +CMTI: "SM",index\r\n
 extern const char* incomingCallString;
-extern const char* callHangupString;
+extern const char* hangupCallString;
+extern const char* powerDownString;
 
 #endif
