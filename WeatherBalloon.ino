@@ -36,7 +36,7 @@ void loop() {
       char c = Serial.read();
       if (c == 'C')
         call(number);
-      else if (c == 'H' && callState == CALL_ACTIVE)
+      else if (c == 'H')
         callHangup();
       else if (c == 'S')
         sendSMS(number, "Nu skulle det gerne virke :)");

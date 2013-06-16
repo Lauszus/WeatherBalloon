@@ -29,6 +29,8 @@
 const uint8_t powerPin = 4;
 const uint8_t LED = 13;
 
+char incomingChar;
+
 char gsmString[20], outString[20];
 char *pGsmString = gsmString, *pOutString = outString;
 

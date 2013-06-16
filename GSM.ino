@@ -15,6 +15,7 @@ void gsmInit() {
 }
 
 void updateGsm() {
+    incomingChar = gsm.read();
     switch(gsmState) {
       case GSM_POWER_ON:
         delay(1000);
@@ -62,11 +63,10 @@ void updateGsm() {
         break;
         
       case GSM_CONNECTION_RESPONSE:
-        if(gsm.available()) {
-          char c = gsm.read();
+        if(incomingChar != -1) {
           Serial.print(F("Connection response: "));
-          Serial.println(c);
-          if(c != '1') {
+          Serial.println(incomingChar);
+          if(incomingChar != '1') {
             delay(1000);
             gsmState = GSM_CHECK_CONNECTION;
           } else {
@@ -79,17 +79,11 @@ void updateGsm() {
       case GSM_RUNNING:
         updateSMS();
         updateCall();
-        if(smsState == SMS_IDLE && callState == CALL_IDLE) {          
-          if(gsm.available()) {
-            char c = gsm.read();
+        if(incomingChar != -1) {
 #ifdef DEBUG
-            Serial.write(c);
-            /*if (c != '\n')
-              Serial.println();
-            Serial.println((uint8_t)c);*/
+          Serial.write(incomingChar);
 #endif
-            checkSMS(c);            
-          }
+          checkSMS(incomingChar);
         }
         break;
       
@@ -119,7 +113,7 @@ void checkSMS(char c) {
       readIndex = false;
       Serial.print(F("Received SMS at index: "));
       Serial.println(lastIndex);
-      if (readSMS(lastIndex)) // Return true if the number of the sender is successfully extracted from the SMS
+      if (readSMS(lastIndex)) // Returns true if the number of the sender is successfully extracted from the SMS
         sendSMS(numberBuffer, "Automatic reponse from WeatherBallon\nMy coordinates are: (lat,lng)");
     } else if (indexCounter < sizeof(lastIndex)/sizeof(lastIndex[0])-1) {
       //Serial.println(F("Storing index"));
@@ -179,8 +173,9 @@ void updateSMS() {
       
     case SMS_CONTENT:
       if(checkOutWaitingString()) {
-        Serial.println(F("Message:"));
-        Serial.println(messageBuffer);
+        Serial.print(F("Message: \""));
+        Serial.print(messageBuffer);
+        Serial.println("\"");
         
         gsm.print(messageBuffer);
         gsm.write(26); // CTRL-Z
@@ -210,7 +205,7 @@ void updateCall() {
       Serial.print(F("Calling: "));
       Serial.println(numberBuffer);
 
-      gsm.print(F("ATD"));
+      gsm.print(F("ATD")); // Dial
       gsm.print(numberBuffer);
       gsm.print(F(";\r"));
       callState = CALL_SETUP;
@@ -232,11 +227,10 @@ void updateCall() {
       break;
       
     case CALL_RESPONSE:
-      if(gsm.available()) {
-        char c = gsm.read();
+      if(incomingChar != -1) {
         Serial.print(F("Connection response: "));
-        Serial.println(c);
-        if(c != '0') {
+        Serial.println(incomingChar);
+        if(incomingChar != '0') {
           delay(1000);
           callState = CALL_SETUP;
         } else {
@@ -247,8 +241,8 @@ void updateCall() {
       break;
       
     case CALL_ACTIVE:
-      if(gsm.available())
-        Serial.write(gsm.read());
+      if(incomingChar != -1)
+        Serial.write(incomingChar);
       break;
       
     default:
@@ -268,12 +262,11 @@ void setOutWaitingString(const char* str) {
 }
 
 boolean checkGsmWaitingString() {
-  if(gsm.available()) {    
-    char c = gsm.read();
+  if(incomingChar != -1) {
 #ifdef DEBUG
-    Serial.write(c);
+    Serial.write(incomingChar);
 #endif
-    if(c == *pGsmString) {
+    if(incomingChar == *pGsmString) {
       digitalWrite(LED,!digitalRead(LED)); // Blink the LED
       pGsmString++;
       if(*pGsmString == '\0') {
@@ -297,12 +290,11 @@ boolean checkGsmWaitingString() {
 }
 
 boolean checkOutWaitingString() {
-  if(gsm.available()) {    
-    char c = gsm.read();
+  if(incomingChar != -1) {
 #ifdef DEBUG
-    Serial.write(c);
+    Serial.write(incomingChar);
 #endif
-    if(c == *pOutString) {
+    if(incomingChar == *pOutString) {
       digitalWrite(LED,!digitalRead(LED)); // Blink the LED
       pOutString++;
       if(*pOutString == '\0') {
@@ -325,7 +317,7 @@ void call(const char* num) {
 
 void gsmActivateAutoAnswer() {
   gsm.print(F("ATS0=001\r"));
-  // 'RING' will be sent on an incoming call
+  // 'RING' will be received on an incoming call
 }
 
 void callHangup() {
@@ -337,7 +329,7 @@ void callAnswer() {
   gsm.print(F("ATA\r"));
 }
 
-//gsm.print(F("AT+CSQ\r")); // Check signal strength - response: 'OK'
+//gsm.print(F("AT+CSQ\r")); // Check signal strength - response: 'OK' and then the information
 
 void sendSMS(const char* num, const char* mes) {  
   strcpy(numberBuffer,num);
