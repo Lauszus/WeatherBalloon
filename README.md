@@ -1,4 +1,4 @@
-# Weather Balloon Android App
+# Weather Balloon Arduino code
 #### Developed by Kristian Lauszus, TKJ Electronics 2013
 
 The code is released under the GNU General Public License.
