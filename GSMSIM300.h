@@ -26,7 +26,7 @@
 #include <SoftwareSerial.h>
 
 #define DEBUG // Print serial debugging
-//#define EXTRADEBUG // Print every character received from the GSM module
+#define EXTRADEBUG // Print every character received from the GSM module
 
 #define GSM_POWER_ON              0
 #define GSM_POWER_ON_WAIT         1
@@ -68,9 +68,8 @@ public:
  	uint8_t gsmState, smsState, callState; 	
  	char numberBuffer[20]; // You might have to adjust this - it is set much larger just in case
 	char messageBuffer[161];
-private:	
-	void checkIncomingCall();
-	void checkCallHangup();
+private:
+	bool checkString(const char *cmpString, char **pString);
 	void updateSMS();
 	void updateCall();
 	void setGsmWaitingString(const char* str);

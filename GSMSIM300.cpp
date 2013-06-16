@@ -130,7 +130,12 @@ void GSMSIM300::update() {
         if(incomingChar != -1) {
           if (checkSMS()) // Return true if a new SMS is received
             newSms = true;
-          checkIncomingCall();
+          if (checkString(incomingCallString,&pIncomingCallString)) {
+#ifdef DEBUG
+            Serial.println(F("Incoming Call"));
+#endif
+            callAnswer();
+          }
         }
         break;
       
@@ -192,31 +197,17 @@ bool GSMSIM300::checkSMS() {
   return false;
 }
 
-// TODO: Make more general function to check any string
-void GSMSIM300::checkIncomingCall() {
-  if (incomingChar == *pIncomingCallString) {
-    pIncomingCallString++;
-    if (*pIncomingCallString == '\0') {
-#ifdef DEBUG
-      Serial.println(F("Incoming Call"));
-#endif
-      callAnswer();
-    }
+// I know this seem confusing, but in order to change the pointer I have to create a pointer to a pointer
+// *(*pString) will get the value of the pointer, while
+// (*pString) will get the address of the pointer
+bool GSMSIM300::checkString(const char *cmpString, char **pString) {
+  if (incomingChar == *(*pString)) {
+    (*pString)++;
+    if (*(*pString) == '\0')
+      return true;
   } else
-    pIncomingCallString = (char*)incomingCallString; // Reset pointer to start of string
-}
-
-void GSMSIM300::checkCallHangup() {
-  if (incomingChar == *pCallHangupString) {
-    pCallHangupString++;
-    if (*pCallHangupString == '\0') {
-#ifdef DEBUG
-      Serial.println(F("Call hangup!"));
-#endif
-      callState = CALL_IDLE;
-    }
-  } else
-    pCallHangupString = (char*)callHangupString; // Reset pointer to start of string
+    *pString = (char*)cmpString; // Reset pointer to start of string
+  return false;
 }
 
 // TODO: Check if updateSMS or updateCall is caught in a loop
@@ -345,8 +336,14 @@ void GSMSIM300::updateCall() {
       break;
       
     case CALL_ACTIVE:
-      if(incomingChar != -1)
-        checkCallHangup();
+      if(incomingChar != -1) {
+        if (checkString(callHangupString,&pCallHangupString)) {
+#ifdef DEBUG
+          Serial.println(F("Call hangup!"));
+#endif
+          callState = CALL_IDLE;
+        }
+      }
       break;
       
     default:
