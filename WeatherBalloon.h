@@ -1,8 +1,6 @@
 #ifndef _weatherBalloon_h_
 #define _weatherBalloon_h_
 
-#define DEBUG
-
 #define GSM_POWER_ON              0
 #define GSM_POWER_ON_WAIT         1
 #define GSM_SET_PIN               2
@@ -34,8 +32,8 @@ const uint8_t LED = 13;
 char gsmString[20], outString[20];
 char *pGsmString = gsmString, *pOutString = outString;
 
-char number[11];
-char message[161];
+char numberBuffer[12];
+char messageBuffer[161];
 
 char receiveSmsString[] = "+CMTI: \"SM\","; // +CMTI: "SM",index\r\n
 char *pReceiveSmsString = receiveSmsString;

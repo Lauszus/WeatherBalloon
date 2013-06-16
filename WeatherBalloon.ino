@@ -4,6 +4,8 @@
 //#define ENABLE_TEMP
 //#define ENABLE_SD_RTC
 
+//#define DEBUG
+
 #include <Wire.h>
 #include <SoftwareSerial.h>
 #include <MemoryFree.h>
