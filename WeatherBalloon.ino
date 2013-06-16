@@ -4,7 +4,7 @@
 //#define ENABLE_TEMP
 //#define ENABLE_SD_RTC
 
-//#define DEBUG
+#define DEBUG
 
 #include <Wire.h>
 #include <SoftwareSerial.h>
@@ -43,6 +43,10 @@ void loop() {
       else if (c == 'R')
         readSMS(lastIndex);
     }
+    if(newSMS) {
+      if(readSMS(lastIndex)) // Returns true if the number of the sender is successfully extracted from the SMS
+        sendSMS(numberBuffer, "Automatic response from WeatherBallon\nMy coordinates are: (lat,lng)");
+    } 
   }
   /*
   if (Serial.available()) {

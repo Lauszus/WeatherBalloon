@@ -16,6 +16,10 @@ void gsmInit() {
 
 void updateGsm() {
     incomingChar = gsm.read();
+#ifdef DEBUG
+    if(incomingChar != -1)
+      Serial.write(incomingChar);
+#endif
     switch(gsmState) {
       case GSM_POWER_ON:
         delay(1000);
@@ -80,10 +84,9 @@ void updateGsm() {
         updateSMS();
         updateCall();
         if(incomingChar != -1) {
-#ifdef DEBUG
-          Serial.write(incomingChar);
-#endif
-          checkSMS(incomingChar);
+          if (checkSMS()) // Return true if a new SMS is received
+            newSMS = true;
+          checkIncomingCall();
         }
         break;
       
@@ -92,7 +95,7 @@ void updateGsm() {
         gsm.print(F("AT+CPOWD=1\r")); // Turn off the module if it's already on
         setGsmWaitingString("NORMAL POWER DOWN");
         gsmState = GSM_POWER_OFF_WAIT;
-        break;        
+        break;
       
       case GSM_POWER_OFF_WAIT:
         if(checkGsmWaitingString()) {
@@ -107,24 +110,25 @@ void updateGsm() {
     }
 }
 
-void checkSMS(char c) {
+boolean checkSMS() {
   if (readIndex) {
-    if (c == '\r') { // End of index
+    if (incomingChar == '\r') { // End of index
       readIndex = false;
       Serial.print(F("Received SMS at index: "));
       Serial.println(lastIndex);
-      if (readSMS(lastIndex)) // Returns true if the number of the sender is successfully extracted from the SMS
-        sendSMS(numberBuffer, "Automatic reponse from WeatherBallon\nMy coordinates are: (lat,lng)");
+      return true;
     } else if (indexCounter < sizeof(lastIndex)/sizeof(lastIndex[0])-1) {
       //Serial.println(F("Storing index"));
-      lastIndex[indexCounter] = c;
+      lastIndex[indexCounter] = incomingChar;
       lastIndex[indexCounter+1] = '\0';
       indexCounter++;
     } else {
       Serial.println(F("Index is too long"));
       readIndex = false;
     }
-  } else if (c == *pReceiveSmsString) {
+  } 
+  // TODO: Can be put in function below when finished
+  else if (incomingChar == *pReceiveSmsString) {
     pReceiveSmsString++;
     if (*pReceiveSmsString == '\0') {
       readIndex = true;
@@ -132,9 +136,34 @@ void checkSMS(char c) {
       //Serial.println(F("Received SMS"));
     }
   } else
-    pReceiveSmsString = receiveSmsString;
+    pReceiveSmsString = receiveSmsString; // Reset pointer to start of string
+  return false;
 }
 
+// TODO: Make more general function to check any string
+void checkIncomingCall() {
+  if (incomingChar == *pIncomingCallString) {
+    pIncomingCallString++;
+    if (*pIncomingCallString == '\0') {
+      Serial.println(F("Incoming Call"));
+      callAnswer();
+    }
+  } else
+    pIncomingCallString = incomingCallString; // Reset pointer to start of string
+}
+
+void checkCallHangup() {
+  if (incomingChar == *pCallHangupString) {
+    pCallHangupString++;
+    if (*pCallHangupString == '\0') {
+      Serial.println(F("Call hangup!"));
+      callState = CALL_IDLE;
+    }
+  } else
+    pCallHangupString = callHangupString; // Reset pointer to start of string
+}
+
+// TODO: Check if updateSMS or updateCall is caught in a loop
 void updateSMS() {
   switch(smsState) {
     case SMS_IDLE:
@@ -143,7 +172,7 @@ void updateSMS() {
     case SMS_MODE:
       Serial.println(F("SMS setting text mode"));
       
-      gsm.print(F("AT+CMGF=1\r")); // Set sms type to text mode
+      gsm.print(F("AT+CMGF=1\r")); // Set SMS type to text mode
       setOutWaitingString("OK");
       smsState = SMS_ALPHABET;
       break;
@@ -186,7 +215,7 @@ void updateSMS() {
       
     case SMS_WAIT:
       if(checkOutWaitingString()) {
-        Serial.println(F("SMS is Send"));
+        Serial.println(F("SMS is sent"));
         smsState = SMS_IDLE;
       }
       break;
@@ -242,7 +271,7 @@ void updateCall() {
       
     case CALL_ACTIVE:
       if(incomingChar != -1)
-        Serial.write(incomingChar);
+        checkCallHangup();
       break;
       
     default:
@@ -261,17 +290,15 @@ void setOutWaitingString(const char* str) {
   pOutString = outString;
 }
 
+// TODO: Combine these two function
 boolean checkGsmWaitingString() {
   if(incomingChar != -1) {
-#ifdef DEBUG
-    Serial.write(incomingChar);
-#endif
     if(incomingChar == *pGsmString) {
       digitalWrite(LED,!digitalRead(LED)); // Blink the LED
       pGsmString++;
       if(*pGsmString == '\0') {
 #ifdef DEBUG
-        Serial.print(F("\r\nGSM Responce success: "));
+        Serial.print(F("\r\nGSM Response success: "));
         Serial.write((uint8_t*)gsmString, strlen(gsmString));
         Serial.println();
 #endif
@@ -280,26 +307,22 @@ boolean checkGsmWaitingString() {
     }
   }
   if(millis() - gsmTimer > 10000) { // Only wait 10s for response    
-    if(gsmState < GSM_RUNNING) {
+    if(gsmState != GSM_RUNNING) {
       Serial.println("\r\nNo response from GSM module\r\nResetting...");
       gsmState = GSM_POWER_ON;
-    }// else
-      //gsmState = GSM_POWER_OFF;
+    }
   }
   return false;
 }
 
 boolean checkOutWaitingString() {
   if(incomingChar != -1) {
-#ifdef DEBUG
-    Serial.write(incomingChar);
-#endif
     if(incomingChar == *pOutString) {
       digitalWrite(LED,!digitalRead(LED)); // Blink the LED
       pOutString++;
       if(*pOutString == '\0') {
 #ifdef DEBUG
-        Serial.print(F("\r\nOut Responce success: "));
+        Serial.print(F("\r\nOut Response success: "));
         Serial.write((uint8_t*)outString, strlen(outString));
         Serial.println();
 #endif
@@ -316,17 +339,17 @@ void call(const char* num) {
 }
 
 void gsmActivateAutoAnswer() {
-  gsm.print(F("ATS0=001\r"));
-  // 'RING' will be received on an incoming call
+  gsm.print(F("ATS0=001\r")); // 'RING' will be received on an incoming call  
 }
 
 void callHangup() {
-  gsm.print(F("ATH\r"));
+  gsm.print(F("ATH\r")); // Response: 'OK'
   callState = CALL_IDLE;
 }
 
 void callAnswer() {
   gsm.print(F("ATA\r"));
+  callState = CALL_ACTIVE;
 }
 
 //gsm.print(F("AT+CSQ\r")); // Check signal strength - response: 'OK' and then the information
@@ -338,6 +361,7 @@ void sendSMS(const char* num, const char* mes) {
 }
 
 boolean readSMS(const char* index) {
+  newSMS = false;
   gsm.print(F("AT+CMGF=1\r"));
   gsm.print(F("AT+CMGR="));
   gsm.print(index);
@@ -366,10 +390,11 @@ boolean readSMS(const char* index) {
           numberFound = true;
           break;
         }
+        // TODO: Gem i dedikeret buffer
         numberBuffer[i] = c;
         numberBuffer[i+1] = '\0';
       }
-      i++;
+      i++; // TODO: Check længden af i
     } else if (c == ',')
       reading = true;
   }
@@ -384,6 +409,7 @@ boolean readSMS(const char* index) {
     Serial.write(c);
 #endif
     if (reading) {
+      // TODO: Gem i messageBuffer
       Serial.write(c);
       if (c == '\n') // End of second string
         break;
@@ -393,7 +419,7 @@ boolean readSMS(const char* index) {
       Serial.print(F("Received message: "));
     }
   }
-  
+  // TODO: 'return numberFound && messageFound;'
   return numberFound;
 }
 

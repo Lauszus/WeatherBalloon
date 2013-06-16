@@ -29,6 +29,8 @@
 const uint8_t powerPin = 4;
 const uint8_t LED = 13;
 
+bool newSMS;
+
 char incomingChar;
 
 char gsmString[20], outString[20];
@@ -42,6 +44,12 @@ char *pReceiveSmsString = receiveSmsString;
 bool readIndex = false;
 char lastIndex[5];
 uint8_t indexCounter;
+
+char incomingCallString[] = "RING";
+char *pIncomingCallString = incomingCallString;
+
+char callHangupString[] = "NO CARRIER";
+char *pCallHangupString = callHangupString;
 
 uint8_t gsmState, smsState, callState;
 uint32_t gsmTimer;
