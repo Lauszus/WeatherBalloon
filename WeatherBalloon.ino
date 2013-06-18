@@ -4,8 +4,8 @@
 //#define ENABLE_TEMP
 //#define ENABLE_SD_RTC
 
-#include <Wire.h>
-#include <SoftwareSerial.h>
+//#include <Wire.h>
+#include <SoftwareSerial.h> // Please increase rx buffer to 256
 #include <MemoryFree.h>
 #include "GSMSIM300.h" // My GSM library
 #include "WeatherBalloon.h"
@@ -13,11 +13,12 @@
 
 uint32_t timer;
 
-GSMSIM300 GSM(pinCode,2,3,4); // Pin code, rx, tx, powerPin
+GSMSIM300 GSM(pinCode,2,3,4,false); // Pin code, rx, tx, powerPin, set to true if the module is already running
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin(); // All calls to Wire.begin has been removed in the libraries, so it's only called once
+  GSM.begin(28800); // I have found this baud rate to work pretty well
+  //Wire.begin(); // All calls to Wire.begin has been removed in the libraries, so it's only called once
   //gpsInit();  
   //pressureInit();
   //timeInit();
@@ -31,7 +32,7 @@ void setup() {
 
 void loop() {
   GSM.update();
-  if (GSM.gsmState == GSM_RUNNING) {
+  if (GSM.getState() == GSM_RUNNING) {
     if (Serial.available()) {
       char c = Serial.read();
       if (c == 'C')
@@ -42,10 +43,16 @@ void loop() {
         GSM.sendSMS(number, "Send lige en sms :)");
       else if (c == 'R')
         GSM.readSMS();
+      else if (c == 'L')
+        //GSM.listSMS("REC UNREAD"); // List unread messages, all is the default
+        //GSM.listSMS();
+        GSM.listSMS("ALL",true);
+      else if (c == 'K')
+        GSM.listSMS("ALL",false);
     }
     if(GSM.newSMS()) {
       if(GSM.readSMS()) // Returns true if the number of the sender is successfully extracted from the SMS
-        GSM.sendSMS(GSM.numberBuffer, "Automatic response from WeatherBallon\nMy coordinates are: (lat,lng)");
+        GSM.sendSMS(GSM.numberIn, "Automatic response from WeatherBallon\nMy coordinates are: (lat,lng)");
     } 
   }
   /*

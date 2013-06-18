@@ -15,8 +15,8 @@
  e-mail   :  kristianl@tkjelectronics.com
  */
 
-#ifndef _sim300_h_
-#define _sim300_h_
+#ifndef _gsmsim300_h_
+#define _gsmsim300_h_
 
 #if defined(ARDUINO) && ARDUINO >=100
 #include "Arduino.h"
@@ -26,7 +26,7 @@
 #include <SoftwareSerial.h>
 
 #define DEBUG // Print serial debugging
-#define EXTRADEBUG // Print every character received from the GSM module
+//#define EXTRADEBUG // Print every character received from the GSM module
 
 #define GSM_POWER_ON              0
 #define GSM_POWER_ON_WAIT         1
@@ -35,7 +35,6 @@
 #define GSM_CHECK_CONNECTION_WAIT 5
 #define GSM_CONNECTION_RESPONSE   6
 #define GSM_RUNNING               7
-
 #define GSM_POWER_OFF             8
 #define GSM_POWER_OFF_WAIT        9
 
@@ -55,52 +54,61 @@
 
 class GSMSIM300 {
 public:
-	GSMSIM300(const char* pinCode, uint8_t rx = 2, uint8_t tx = 3, uint8_t powerPin = 4);
+	GSMSIM300(const char *pinCode, uint8_t rx = 2, uint8_t tx = 3, uint8_t powerPin = 4, bool running = false);
+
+	void begin(uint32_t baud = 9600);
 	void update();
 	bool checkSMS();
- 	bool newSMS() {
- 		return _newSMS;
- 	};
- 	void call(const char* num);
+	bool newSMS() {
+		return newSms;
+	};
+	void call(const char *num);
 	void hangup();
-	void sendSMS(const char* num, const char* mes);
-	bool readSMS(char* index = NULL);
- 	uint8_t gsmState, smsState, callState; 	
- 	char numberBuffer[20]; // You might have to adjust this - it is set much larger just in case
-	char messageBuffer[161];
+	void sendSMS(const char *num, const char *mes);
+	bool readSMS(char *index = NULL);
+	void deleteSMS(char *index = NULL);
+	void deleteSMSAll();
+	void listSMS(const char *type = "ALL", bool print = true); // Available ones are: "REC UNREAD", "REC READ", "STO UNSENT", "STO SENT", and "ALL"
+	uint8_t getState() {
+		return gsmState;
+	}
+	char numberIn[20], numberOut[20]; // You might have to adjust this - remember to include country code
+	char messageIn[50], messageOut[50];
 private:
-	bool checkString(const char *cmpString, char **pString);
+	SoftwareSerial *gsm;
+
 	void updateSMS();
 	void updateCall();
-	void setGsmWaitingString(const char* str);
-	void setOutWaitingString(const char* str);
+	void setGsmWaitingString(const char *str);
+	void setOutWaitingString(const char *str);
+	void setSMSTextMode();
+
 	bool checkGsmWaitingString();
-	bool checkOutWaitingString();	
-	//void gsmActivateAutoAnswer();	
-	void answer();	
+	bool checkOutWaitingString();
+	bool checkString(char input, const char *cmpString, char **pString);
+	bool extractContent(char *buffer, uint8_t size, char beginChar, char endChar, uint8_t offset); // Helper function to get content inside string
+	
+	void answer();
 	void powerOn();
 	void powerOff();
 
-	SoftwareSerial *gsm;
+	const char *pinCode;
 	const uint8_t powerPin;
-	const char* pinCode;
-	char lastIndex[5];
 
-	bool _newSMS;
+	static const char *receiveSmsString, *incomingCallString, *hangupCallString, *powerDownString;
+	char *pReceiveSmsString, *pIncomingCallString, *pHangupCallString, *pPowerDownString;
+	
 	char incomingChar;
 	char gsmString[20], outString[20];
 	char *pGsmString, *pOutString;
-
-	char *pReceiveSmsString, *pIncomingCallString, *pHangupCallString, *pPowerDownString;
-	bool readIndex;	
-	uint8_t indexCounter;
+	char lastIndex[5];
 
 	uint32_t gsmTimer;
+	uint8_t gsmState, smsState, callState;	
+	uint8_t indexCounter;
+	
+	bool readIndex;
+	bool newSms;	
 };
-
-extern const char* receiveSmsString; // +CMTI: "SM",index\r\n
-extern const char* incomingCallString;
-extern const char* hangupCallString;
-extern const char* powerDownString;
 
 #endif
