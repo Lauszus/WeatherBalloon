@@ -1,0 +1,3 @@
+[submodule "libraries/GSMSIM300"]
+	path = libraries/GSMSIM300
+	url = https://github.com/Lauszus/GSMSIM300.git
