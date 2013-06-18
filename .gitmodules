@@ -1,3 +1,12 @@
 [submodule "libraries/GSMSIM300"]
 	path = libraries/GSMSIM300
 	url = https://github.com/Lauszus/GSMSIM300.git
+[submodule "libraries/RTClib"]
+	path = libraries/RTClib
+	url = https://github.com/adafruit/RTClib.git
+[submodule "libraries/Adafruit_BMP085_Library"]
+	path = libraries/Adafruit_BMP085_Library
+	url = https://github.com/adafruit/Adafruit-BMP085-Library.git
+[submodule "libraries/TinyGPS"]
+	path = libraries/TinyGPS
+	url = https://github.com/KevWal/TinyGPS
