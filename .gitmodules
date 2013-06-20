@@ -7,6 +7,3 @@
 [submodule "libraries/Adafruit_BMP085_Library"]
 	path = libraries/Adafruit_BMP085_Library
 	url = https://github.com/adafruit/Adafruit-BMP085-Library.git
-[submodule "libraries/TinyGPS"]
-	path = libraries/TinyGPS
-	url = https://github.com/KevWal/TinyGPS

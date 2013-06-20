@@ -1,0 +1,1 @@
+The TinyGPS library is available on following site: <http://arduiniana.org/libraries/tinygps/>.
