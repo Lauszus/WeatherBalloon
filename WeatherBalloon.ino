@@ -17,7 +17,7 @@ uint32_t timer;
 // The constructor below will start a SoftwareSerial connection on the chosen rx and tx pins
 // The power pin is connected to the status pin on the module
 // Letting the microcontroller turn the module on and off
-GSMSIM300 GSM(pinCode,2,3,4,false); // Pin code, rx, tx, power pin, set to true if the module is already running
+GSMSIM300 GSM(pinCode,2,3,4,true); // Pin code, rx, tx, power pin, set to true if the module is already running
 
 void setup() {
   Serial.begin(115200);
@@ -54,9 +54,9 @@ void loop() {
       if(GSM.readSMS()) { // Returns true if the number and message of the sender is successfully extracted from the SMS
         //GSM.sendSMS(GSM.numberIn, "Automatic response from WeatherBallon\nMy coordinates are: (lat,lng)"); // Sends a response to that number
         if (strcmp(GSM.messageIn,"CMD") == 0) {
-          if (flat != TinyGPS::GPS_INVALID_F_ANGLE && flon != TinyGPS::GPS_INVALID_F_ANGLE) {
+          if (lat != TinyGPS::GPS_INVALID_ANGLE && lng != TinyGPS::GPS_INVALID_ANGLE) {
             char buf[50];
-            sprintf(buf, "My coordinates are: %f,%f",flat,flon);
+            sprintf(buf, "My coordinates are: %d.%ld,%d.%ld",(int16_t)floor(lat/100000UL),lat%100000UL,(int16_t)floor(lng/100000UL),lng%100000UL);
             GSM.sendSMS(GSM.numberIn, buf);
           } else
             GSM.sendSMS(GSM.numberIn, "Still waiting for fix");

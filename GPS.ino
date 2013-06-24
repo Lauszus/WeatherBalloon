@@ -40,9 +40,15 @@ static void gpsdump(TinyGPS &gps) {
   unsigned long age, date, time, chars = 0;
   unsigned short sentences = 0, failed = 0;
   
+  gps.get_position(&lat,&lng,&age);
+  char buf[50];
+  sprintf(buf, "My coordinates are: %d.%ld,%d.%ld",(int16_t)floor(lat/100000UL),lat%100000UL,(int16_t)floor(lng/100000UL),lng%100000UL);
+  Serial.println(buf);
+  
   print_int(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
   print_int(gps.hdop(), TinyGPS::GPS_INVALID_HDOP, 5);
   gps.f_get_position(&flat, &flon, &age);
+  
   print_float(flat, TinyGPS::GPS_INVALID_F_ANGLE, 9, 5);
   print_float(flon, TinyGPS::GPS_INVALID_F_ANGLE, 10, 5);
   print_int(age, TinyGPS::GPS_INVALID_AGE, 5);
