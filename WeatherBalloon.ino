@@ -57,7 +57,7 @@ void loop() {
           if (flat != TinyGPS::GPS_INVALID_F_ANGLE && flon != TinyGPS::GPS_INVALID_F_ANGLE) {
             char buf[50];
             sprintf(buf, "My coordinates are: %f,%f",flat,flon);
-            GSM.sendSMS(GSM.numberIn, "Automatic response from WeatherBallon\nMy coordinates are: (lat,lng)");
+            GSM.sendSMS(GSM.numberIn, buf);
           } else
             GSM.sendSMS(GSM.numberIn, "Still waiting for fix");
         }
