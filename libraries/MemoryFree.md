@@ -1,1 +1,0 @@
-The MemoryFree library can be found on the following site: <http://playground.arduino.cc/Code/AvailableMemory>.
