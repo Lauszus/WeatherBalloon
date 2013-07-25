@@ -49,6 +49,8 @@ void loop() {
         GSM.readSMS(); // Read the last returned SMS
       else if (c == 'L')
         GSM.listSMS("ALL"); // List all messages
+      else if (c == 'D')
+        GSM.deleteSMSAll(); // Deletes all messages on the SIM card - this is useful as the SIM card has very limited storage capability
     }
     if(GSM.newSMS()) { // Check if a new SMS is received
       if(GSM.readSMS()) { // Returns true if the number and message of the sender is successfully extracted from the SMS
@@ -62,6 +64,7 @@ void loop() {
             GSM.sendSMS(GSM.numberIn, "Still waiting for fix");
         }
       }
+      GSM.deleteSMS(); // Delete the SMS again, as the SIM card has very limited storage capability
     } 
   }
   /*
