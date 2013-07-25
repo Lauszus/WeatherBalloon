@@ -10,7 +10,7 @@ void printTemp(void) {
   byte type_s;
   byte data[12];
   byte addr[8];
-  float celsius, fahrenheit;
+  float celsius;//, fahrenheit;
   
   if (!ds.search(addr)) {
     Serial.println(F("No more addresses.\r\n"));
@@ -30,26 +30,26 @@ void printTemp(void) {
       return;
   }
   //Serial.println();
- /*
+  
   // the first ROM byte indicates which chip
   switch (addr[0]) {
     case 0x10:
-      Serial.println("  Chip = DS18S20");  // or old DS1820
+      //Serial.println("  Chip = DS18S20");  // or old DS1820
       type_s = 1;
       break;
     case 0x28:
-      Serial.println("  Chip = DS18B20");
+      //Serial.println("  Chip = DS18B20");
       type_s = 0;
       break;
     case 0x22:
-      Serial.println("  Chip = DS1822");
+      //Serial.println("  Chip = DS1822");
       type_s = 0;
       break;
     default:
-      Serial.println("Device is not a DS18x20 family device.");
+      //Serial.println("Device is not a DS18x20 family device.");
       return;
   }
-*/
+  
   ds.reset();
   ds.select(addr);
   ds.write(0x44, 1);        // start conversion, with parasite power on at the end
@@ -93,7 +93,7 @@ void printTemp(void) {
     //// default is 12 bit resolution, 750 ms conversion time
   }
   celsius = (float)raw / 16.0;
-  fahrenheit = celsius * 1.8 + 32.0;
+  //fahrenheit = celsius * 1.8 + 32.0;
   Serial.print(F("Temperature = "));
   Serial.print(celsius);
   Serial.println(F(" *C\r\n"));
