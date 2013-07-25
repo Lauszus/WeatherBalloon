@@ -42,7 +42,7 @@ static void gpsdump(TinyGPS &gps) {
   
   gps.get_position(&lat,&lng,&age);
   char buf[50];
-  sprintf(buf, "My coordinates are: %d.%ld,%d.%ld",(int16_t)floor(lat/100000UL),lat%100000UL,(int16_t)floor(lng/100000UL),lng%100000UL);
+  sprintf(buf, "My coordinates are: %ld.%ld,%ld.%ld",lat/100000,lat%100000,lng/100000,lng%100000);
   Serial.println(buf);
   
   print_int(gps.satellites(), TinyGPS::GPS_INVALID_SATELLITES, 5);
